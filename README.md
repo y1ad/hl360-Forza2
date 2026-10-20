@@ -193,8 +193,9 @@ All keys can be changed in **Controls**.
   some packs may fail to install; the error is written to the log.
 - Some antivirus engines flag the download with generic or heuristic
   detections. The file they point at is `rexruntime.dll`, the ReXGlue SDK
-  runtime, shipped unchanged from the official release. The executables are
-  not code-signed yet; each release lists the SHA-256 of its files.
+  runtime, built from the SDK source (patched for Vulkan, see
+  [`docs/VULKAN.md`](docs/VULKAN.md)). The executables are not code-signed
+  yet; each release lists the SHA-256 of its files.
 - Xbox Live features are not available.
 - Online, with three or more players, a player who joins may occasionally not
   see one of the others and the game can close when that race starts. Leaving
