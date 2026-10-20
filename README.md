@@ -16,18 +16,19 @@
 Play *Forza Motorsport 2* (Xbox 360, 2007) natively on Windows. The game's
 PowerPC code is statically recompiled ahead of time into C++ and then compiled
 for x86-64: there is no CPU emulation and no JIT compiler. Graphics are
-rendered through Direct3D 12 and audio is decoded natively.
+rendered through Vulkan and audio is decoded natively.
 
 > [!IMPORTANT]
 > No copyrighted game files are included. You must provide your own original
 > European or American Xbox 360 copy of *Forza Motorsport 2* as a disc image.
 
 > [!WARNING]
-> Version 0.3.0 is playable but still a work in progress. Menus and videos are
-> functional, while exhibition races and Free Run can hold 60 FPS; 120 Hz race
-> output is also available on sufficiently fast hardware. Career mode,
-> split-screen, and DLC content still need broader testing. Xbox Live is not
-> available.
+> Version 0.3.1 is playable but still a work in progress. Menus and videos are
+> functional, while exhibition races and Free Run can hold 60 FPS; 120 FPS race
+> output is also available on sufficiently fast hardware. Online races through
+> System Link work; with three or more players a join can occasionally fail.
+> Career mode, split-screen, and DLC content still need broader testing. Xbox
+> Live is not available.
 
 <p align="center">
   <img src="docs/img/game-race-mugello.jpg" alt="Racing at Mugello" width="49%">
@@ -41,9 +42,10 @@ rendered through Direct3D 12 and audio is decoded natively.
 ## Highlights
 
 - Native x86-64 execution through static PowerPC-to-C++ recompilation.
-- Direct3D 12 rendering with internal resolutions up to 4K.
-- 60 Hz and optional 120 Hz race modes.
-- Anisotropic filtering, MSAA, FXAA, AMD FSR, and AMD CAS.
+- Vulkan rendering with internal resolutions up to 4K.
+- 60 FPS and optional 120 FPS race modes.
+- Online races through the game's own System Link menus, no port forwarding.
+- Native 2x MSAA, anisotropic filtering, AMD FSR, and AMD CAS.
 - Xbox-compatible controllers and fully remappable keyboard controls.
 - Named local profiles with separate save data.
 - Built-in ISO extraction and SHA-256 file verification.
@@ -55,7 +57,7 @@ rendered through Direct3D 12 and audio is decoded natively.
 ## Requirements
 
 - Windows 10 or 11, 64-bit
-- A GPU with Direct3D 12 support
+- A GPU with Vulkan support and current drivers
 - About 5 GB of free disk space
 - Your own Forza Motorsport 2 disc image (`.iso`), European or American
   release (title ID `4D5307EA`)
@@ -76,19 +78,19 @@ with each release.
 4. Go to **Profiles** and create your profile.
 5. Press **PLAY**.
 
-The first time you press PLAY, and after changing the internal resolution or
-MSAA, the launcher prepares the shaders first (with a progress bar) and then
-starts the game.
+The first time you press PLAY, and after changing the internal resolution,
+the launcher prepares the shaders first (with a progress bar) and then starts
+the game.
 
 ## The launcher
 
 | Tab | What you can do |
 |---|---|
-| **Profiles** | Create, choose and delete profiles. Each profile has its own saves. |
-| **Graphics** | Fullscreen or window, monitor, window size, refresh rate (60 or 120 Hz), quality presets (Original 720p / High 1440p / Ultra 4K), internal resolution, anisotropic filtering, MSAA, anti-aliasing and upscaling. |
+| **Profiles** | Create, choose and delete profiles. Each profile has its own saves. The **Online** card turns online play on or off and shows whether the server answers. |
+| **Graphics** | Fullscreen or window, monitor, window size, frame rate (60 or 120 fps), vertical sync, quality presets (Low / Medium / High / Custom), render scale 1x-4x, anisotropic filtering and output scaling (bilinear, AMD CAS, AMD FSR). |
 | **Controls** | Controller or keyboard, mouse for the camera, and key remapping. |
 | **Language & sound** | Game language (English, Español, Français, Deutsch, Italiano) and mute. |
-| **Install** | Import the game from an ISO or choose its folder. Once installed: verify files, add the bonus disc DLC and prepare shaders. |
+| **Install** | Import the game from an ISO or choose its folder. Once installed: verify files and add the bonus disc DLC. Shader preparation is automatic. |
 | **Forza Plus 2** | Install, update and remove the Project Forza Plus 2 mod, switch its career mode and AI, and set each camera's field of view. |
 | **Support** | Link to the project's Ko-fi. |
 
@@ -101,13 +103,12 @@ fills the left column; without it the launcher draws its own panel.
   <img src="docs/img/launcher-forza-plus-2.png" alt="Launcher: Project Forza Plus 2" width="49%">
 </p>
 
-### Refresh rate
+### Frame rate
 
-The game paces itself on the refresh rate chosen in **Graphics**: **60 Hz**
-holds a steady 60 fps in races; **120 Hz** runs races at up to 120 fps and
-needs a 120 Hz monitor and a fast CPU. Menus run at half the rate, as on the
-Xbox 360. 144 Hz is not offered: at that rate races wait two refreshes per
-frame and ran slower than at 60 Hz.
+The game paces itself on the frame rate chosen in **Graphics**: **60 fps**
+holds steady in races; **120 fps** runs races at up to 120 fps and needs a
+120 Hz monitor and a fast CPU. Menus run at half the rate, as on the Xbox 360.
+The game's native 2x MSAA is always on.
 
 ## Limited Edition bonus-disc content
 
@@ -138,6 +139,20 @@ original files are kept, so uninstalling puts the game back exactly as it was.
 The mod already includes the DLC cars and tracks, so the bonus disc packs are
 not installed alongside it. The launcher also matches the mod's physics rate
 (`CarPhysicsUpdateHz`) to the chosen refresh rate, as the mod's author asks.
+
+## Online play
+
+*Multiplayer → System Link* lists every race hosted on the online server:
+create one or join one as on a local network. All traffic goes through the
+server, so nobody needs to open ports. Keep **Play online** on in the
+launcher's **Online** card (*Profiles* tab); its dot is green when the server
+answers. Your gamertag is your name online, and every player needs the same
+port version (and the same Project Forza Plus 2 version, if used).
+
+The server is [`tools/fm2-relay`](tools/fm2-relay): one Python 3 script with
+no dependencies and a systemd unit. The launcher's server is a build setting
+(`FM2_ONLINE_SERVER=host:port`), so builds without it have no online option.
+Network internals and diagnostics are in [`docs/LAN.md`](docs/LAN.md).
 
 ## Controls
 
@@ -181,6 +196,9 @@ All keys can be changed in **Controls**.
   runtime, shipped unchanged from the official release. The executables are
   not code-signed yet; each release lists the SHA-256 of its files.
 - Xbox Live features are not available.
+- Online, with three or more players, a player who joins may occasionally not
+  see one of the others and the game can close when that race starts. Leaving
+  and joining again fixes it.
 
 If the game closes with an error, the launcher tells you. Please open an
 [issue](../../issues) and attach the file from the `logs\` folder.
@@ -194,15 +212,18 @@ Requires Visual Studio 2022 (or Build Tools) with the C++ workload, and LLVM:
 ```
 winget install Microsoft.VisualStudio.2022.BuildTools --override "--add Microsoft.VisualStudio.Workload.VCTools --includeRecommended"
 winget install LLVM.LLVM
-build.bat release          :: or relwithdebinfo for symbolized crash reports
-tools\package_release.ps1  :: builds dist\Forza2-Native-<version>-windows-x64.zip
+set FM2_ONLINE_SERVER=host:port   :: optional: the launcher's online server
+build-vulkan.bat                  :: build.bat calls it too
+tools\package_release.ps1         :: builds dist\Forza2-Native-<version>-windows-x64.zip
 ```
 
-`build.bat` downloads the [ReXGlue SDK](https://github.com/rexglue/rexglue-sdk)
-v0.10.0 into `_sdk\` on first run. The recompiled code in `generated/` is
-committed, so a clone builds without the game. To regenerate it, put your
-`default.xex` in `assets\` and build again. `run.bat` starts the development
-build against `assets\` and logs to `run.log`.
+The Vulkan build uses the patched source ReXGlue SDK shared with the Forza
+Motorsport 4 port (`..\..\fm4-recomp\work\vulkan-trial` by default; pass
+another path to `build-vulkan.bat`); see [`docs/VULKAN.md`](docs/VULKAN.md).
+The released [ReXGlue SDK](https://github.com/rexglue/rexglue-sdk) v0.10.0 is
+Direct3D 12 only and cannot load the Vulkan GPU plugin. The recompiled code in
+`generated/` is committed, so a clone builds without the game. `run.bat`
+starts the development build against `assets\` and logs to `run.log`.
 
 ### Repository layout
 
@@ -213,9 +234,10 @@ build against `assets\` and logs to `run.log`.
 | [`src/`](src) | Port code on top of the recompiled game: app setup, profiles, DLC install, crash reports, fixes and diagnostics |
 | [`launcher/`](launcher) | `Forza2Launcher` (SDL3 + Dear ImGui): profiles, settings, ISO import and verification, Project Forza Plus 2 |
 | [`config/forza2.toml`](config/forza2.toml) | Runtime settings the game needs, shipped next to the exe |
-| [`tools/`](tools) | Packaging, file manifest, scripted test sessions; [`tools/analysis/`](tools/analysis) has the disc/XEX scripts used to find what codegen missed |
-| [`docs/`](docs) | Player notes (`PLAYERS.md`, shipped as `LEEME.md`), third-party notices, images |
-| [`cmake/`](cmake), [`scripts/`](scripts) | Build helpers and the SDK download |
+| [`tools/`](tools) | Packaging, file manifest, scripted test sessions, the online server ([`tools/fm2-relay`](tools/fm2-relay)); [`tools/analysis/`](tools/analysis) has the disc/XEX scripts used to find what codegen missed |
+| [`docs/`](docs) | Player notes (`PLAYERS.md`, shipped as `LEEME.md`), third-party notices, Vulkan and network notes, images |
+| [`tests/`](tests) | Network layer tests (`fm2-lan-tests`) |
+| [`cmake/`](cmake), [`scripts/`](scripts) | Build helpers, the Vulkan targets and SDK patch, LAN/online lab scripts |
 
 ### How it was ported
 
@@ -229,6 +251,7 @@ build against `assets\` and logs to `run.log`.
 | Null-stream crash while loading races | [`src/stream_guard.cpp`](src/stream_guard.cpp) |
 | GPU log spam that cost frame rate | [`src/log_filter.cpp`](src/log_filter.cpp) |
 | Guest call chain on crashes | [`src/crash_report.cpp`](src/crash_report.cpp) |
+| System Link over the network, online relay client, DirectPlay tuning | [`src/lan.cpp`](src/lan.cpp), [`src/lan_wsa.inc`](src/lan_wsa.inc), [`src/lan_relay.inc`](src/lan_relay.inc) |
 
 Every recompiled function is a weak `sub_<address>` that forwards to
 `__imp__sub_<address>`, so any of them can be wrapped or replaced from `src/`.

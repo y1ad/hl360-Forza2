@@ -1,4 +1,4 @@
-﻿// Forza2Launcher - profiles, settings and game import for the recompiled
+// Forza2Launcher - profiles, settings and game import for the recompiled
 // Forza Motorsport 2. Sits next to forza2.exe; writes forza2.user.toml (read by
 // the game after its own forza2.toml) and launches the game.
 //
@@ -32,6 +32,7 @@
 #include "forza_plus.h"
 #include "i18n.h"
 #include "installer.h"
+#include "online_status.h"
 #include "settings.h"
 
 namespace fs = std::filesystem;
@@ -208,6 +209,7 @@ struct App {
   Cover cover;
 
   Settings settings;
+  OnlineStatus online_status;  // relay reachability, probed at startup
   std::vector<ManifestEntry> manifest;
   Tab tab = Tab::kProfiles;
   std::string notice;
@@ -390,7 +392,7 @@ struct App {
 
   void LaunchGame() {
     Save();
-    const std::string physics = SetForzaPlusPhysicsRate(GameDir(), settings.refresh_rate);
+    const std::string physics = SetForzaPlusPhysicsRate(GameDir(), settings.experimental_120fps ? 120 : 60);
     if (!physics.empty()) notice = physics;
     if (!fs::exists(game_exe)) {
       notice = std::string(L("Not found: ", "No se encuentra ")) + game_exe.u8string();
@@ -429,8 +431,8 @@ struct App {
   // progress bar. Shader translation depends on the internal resolution and
   // MSAA, so a change there means warming up again.
 
-  static constexpr const char* kCacheFiles[] = {"4D5307EA.xsh", "4D5307EA.rtv.d3d12.xpso"};
-  static constexpr size_t kCacheHeaderBytes[] = {8, 12};
+  static constexpr const char* kCacheFiles[] = {"4D5307EA.xsh", "4D5307EA.fsi.vk.xpso", "4D5307EA.fbo.vk.xpso"};
+  static constexpr size_t kCacheHeaderBytes[] = {8, 12, 12};
 
   fs::path WarmupMarker() const { return shader_cache_dir / "forza2-warmup.txt"; }
 
@@ -445,7 +447,7 @@ struct App {
   }
 
   std::string WarmupFingerprint() const {
-    return "bundle=" + BundleSignature() + " scale=" + std::to_string(settings.resolution_scale) +
+    return "backend=vulkan-fbo-fm2-v3 bundle=" + BundleSignature() + " scale=" + std::to_string(settings.resolution_scale) +
            " msaa=" + (settings.native_2x_msaa ? "1" : "0");
   }
 
@@ -677,7 +679,11 @@ void EndCard() {
 }
 
 bool BeginRows(const char* id) {
-  return ImGui::BeginTable(id, 2, ImGuiTableFlags_SizingStretchProp);
+  if (!ImGui::BeginTable(id, 2, ImGuiTableFlags_None)) return false;
+  // Fixed label column, so hints wrap under their label instead of squeezing it.
+  ImGui::TableSetupColumn("label", ImGuiTableColumnFlags_WidthFixed, S(250));
+  ImGui::TableSetupColumn("control", ImGuiTableColumnFlags_WidthStretch);
+  return true;
 }
 
 // Starts a settings row: label (+ optional hint) left, control column right.
@@ -934,6 +940,38 @@ void CoverPanel(App& app, const ImVec2& size) {
 
 // --- Tabs ------------------------------------------------------------------
 
+// Online switch plus a reachability dot; the server address is never shown.
+void OnlineCard(App& app) {
+  BeginCard("##online", L("Online", "Online"));
+  if (BeginRows("##online_rows")) {
+    Row(L("Play online", "Jugar online"));
+    if (Toggle("##online_toggle", &app.settings.online)) {
+      app.Save();
+      if (app.settings.online) app.online_status.Start(app.settings.online_server);
+    }
+    if (app.settings.online) {
+      Row(L("Server", "Servidor"));
+      // Dot and text aligned to the row label (frame-padded text line).
+      const auto status = [](const ImVec4& color, const char* text) {
+        const ImVec2 p = ImGui::GetCursorScreenPos();
+        const float r = S(5);
+        const float y = p.y + ImGui::GetStyle().FramePadding.y + ImGui::GetTextLineHeight() * 0.5f;
+        ImGui::GetWindowDrawList()->AddCircleFilled(ImVec2(p.x + r, y), r, Col(color));
+        ImGui::SetCursorScreenPos(ImVec2(p.x + r * 2 + S(8), p.y));
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextUnformatted(text);
+      };
+      switch (app.online_status.state()) {
+        case OnlineStatus::State::kChecking: status(kDim, L("Checking...", "Comprobando...")); break;
+        case OnlineStatus::State::kAvailable: status(kOk, L("Server available", "Servidor disponible")); break;
+        case OnlineStatus::State::kUnavailable: status(kBad, L("Server unavailable", "Servidor no disponible")); break;
+      }
+    }
+    EndRows();
+  }
+  EndCard();
+}
+
 void TabProfiles(App& app) {
   BeginCard("##profiles", L("Profiles", "Perfiles"),
             L("Each profile is a gamertag with its own saves, cars and options.",
@@ -1018,6 +1056,9 @@ void TabProfiles(App& app) {
   else if (exists) TextColored(kWarn, L("A profile with that name already exists.", "Ya existe un perfil con ese nombre."));
   EndCard();
 
+  // Builds without FM2_ONLINE_SERVER have no online play to offer.
+  if (!app.settings.online_server.empty()) OnlineCard(app);
+
   if (app.open_delete_popup) {
     ImGui::OpenPopup("###delete_profile");
     app.open_delete_popup = false;
@@ -1049,35 +1090,11 @@ void TabProfiles(App& app) {
   }
 }
 
-// Quality presets map onto the individual settings; anything else is "custom".
-struct Preset {
-  int id;
-  const char* name;
-  int scale, aniso;
-  bool msaa;
-  const char* aa;
-  const char* present;
-};
-const Preset kPresets[] = {
-    {0, "Original 720p", 1, 3, true, "none", "bilinear"},
-    {1, "High 1440p", 2, 5, true, "none", "bilinear"},
-    {2, "Ultra 4K", 3, 5, true, "fxaa", "cas"},
-};
-
-int CurrentPreset(const Settings& s) {
-  for (const auto& p : kPresets) {
-    if (s.resolution_scale == p.scale && s.anisotropic_override == p.aniso &&
-        s.native_2x_msaa == p.msaa && s.swap_post_effect == p.aa && s.present_effect == p.present) {
-      return p.id;
-    }
-  }
-  return 3;
-}
-
 void TabGraphics(App& app) {
   Settings& s = app.settings;
   bool changed = false;
 
+  TextDim(L("Graphics backend: Vulkan", "Motor grafico: Vulkan"));
   BeginCard("##display", L("Display", "Pantalla"));
   if (BeginRows("##d")) {
     Row(L("Mode", "Modo"));
@@ -1102,59 +1119,59 @@ void TabGraphics(App& app) {
       Row(L("Window size", "Tamaño de ventana"));
       int size = s.window_width * 10000 + s.window_height;
       if (Combo<int>("##winsize", size,
-                     {{12800720, "1280 × 720"},
-                      {16000900, "1600 × 900"},
-                      {19201080, "1920 × 1080"},
-                      {25601440, "2560 × 1440"},
-                      {38402160, "3840 × 2160"}})) {
+                     {{12800720, "1280 x 720"},
+                      {16000900, "1600 x 900"},
+                      {19201080, "1920 x 1080"},
+                      {25601440, "2560 x 1440"},
+                      {38402160, "3840 x 2160"}})) {
         s.window_width = size / 10000;
         s.window_height = size % 10000;
         changed = true;
       }
     }
-    Row(L("Refresh rate", "Frecuencia"));
-    changed |= Segmented<int>("refresh", s.refresh_rate, {{60, "60 Hz"}, {120, "120 Hz"}});
     Row(L("Keep 16:9", "Mantener 16:9"));
     changed |= Toggle("##letterbox", &s.present_letterbox);
+    Row(L("Vertical sync (VSync)", "Sincronizacion vertical (VSync)"));
+    changed |= Toggle("##vsync", &s.vsync);
+    Row(L("Frame rate", "Fotogramas por segundo"));
+    changed |= Segmented<bool>("##framerate",s.experimental_120fps,
+        {{false,"60 FPS / 60 Hz"},{true,"120 FPS / 120 Hz"}});
     EndRows();
+  }
+  if(s.experimental_120fps) {
+    TextColored(kWarn, "Experimental");
   }
   EndCard();
 
   BeginCard("##quality", L("Image quality", "Calidad de imagen"));
-  int preset = CurrentPreset(s);
-  if (Segmented<int>("preset", preset,
-                     {{0, "Original 720p"}, {1, L("High 1440p", "Alta 1440p")}, {2, "Ultra 4K"},
-                      {3, L("Custom", "Personalizada")}}) &&
-      preset < 3) {
-    const Preset& p = kPresets[preset];
-    s.resolution_scale = p.scale;
-    s.anisotropic_override = p.aniso;
-    s.native_2x_msaa = p.msaa;
-    s.swap_post_effect = p.aa;
-    s.present_effect = p.present;
+  int preset = s.graphics_preset;
+  if (Segmented<int>("quality_preset", preset,
+      {{0, L("Low", "Bajo")}, {1, L("Medium", "Medio")},
+       {2, L("High", "Alto")}, {3, L("Custom", "Personalizado")}})) {
+    s.ApplyGraphicsPreset(preset);
     changed = true;
   }
-  ImGui::Dummy(ImVec2(0, S(8)));
-  if (BeginRows("##q")) {
-    Row(L("Internal resolution", "Resolución interna"));
+  const char* preset_details[] = {
+      L("1x (720p) / Anisotropic filtering 4x / AMD FSR",
+        "1x (720p) / Filtrado anisotropico 4x / AMD FSR"),
+      L("2x (1440p) / Anisotropic filtering 8x / AMD FSR",
+        "2x (1440p) / Filtrado anisotropico 8x / AMD FSR"),
+      L("2x (1440p) / Anisotropic filtering 16x / Bilinear",
+        "2x (1440p) / Filtrado anisotropico 16x / Bilineal"),
+      L("Choose render scale, anisotropic filtering and output scaling below.",
+        "Elige la escala, el filtrado anisotropico y el escalado a pantalla.")};
+  TextColored(kBad, preset_details[std::clamp(s.graphics_preset, 0, 3)]);
+  if (s.graphics_preset == 3 && BeginRows("##q")) {
+    Row(L("Render scale", "Escala de renderizado"));
     changed |= Segmented<int>("scale", s.resolution_scale,
-                              {{1, "720p (1×)"}, {2, "1440p (2×)"}, {3, "4K (3×)"}});
-    Row(L("Anisotropic filtering", "Filtrado anisótropo"));
+                              {{1, "1x 720p"}, {2, "2x 1440p"},
+                               {3, "3x 4K"}, {4, "4x 5K"}});
+    Row(L("Anisotropic filtering", "Filtrado anisotropico"));
     changed |= Combo<int>("##aniso", s.anisotropic_override,
-                          {{-1, L("Game default", "Lo que pida el juego")},
-                           {0, L("Off", "Desactivado")},
-                           {2, "2×"},
-                           {3, "4×"},
-                           {4, "8×"},
-                           {5, "16×"}});
-    Row(L("Native 2× MSAA", "MSAA 2× nativo"));
-    changed |= Toggle("##msaa", &s.native_2x_msaa);
-    Row(L("Extra anti-aliasing", "Antialiasing extra"));
-    changed |= Segmented<std::string>(
-        "aa", s.swap_post_effect, {{"none", L("None", "Ninguno")}, {"fxaa", "FXAA"}, {"fxaa_extreme", "FXAA+"}});
+        {{0, L("Off", "No")}, {1, "1x"}, {2, "2x"}, {3, "4x"}, {4, "8x"}, {5, "16x"}});
     Row(L("Output scaling", "Escalado a pantalla"));
-    changed |= Segmented<std::string>(
-        "present", s.present_effect, {{"bilinear", L("Bilinear", "Bilineal")}, {"cas", "AMD CAS"}, {"fsr", "AMD FSR"}});
+    changed |= Segmented<std::string>("present", s.present_effect,
+        {{"bilinear", L("Bilinear", "Bilineal")}, {"cas", "AMD CAS"}, {"fsr", "AMD FSR"}});
     EndRows();
   }
   EndCard();
@@ -1578,35 +1595,18 @@ void TabInstall(App& app) {
   }
   EndCard();
 
-  BeginCard("##shaders", L("Shader cache", "Caché de shaders"),
-            L("Shaders are prepared before the first race so it does not stutter. It happens by itself "
-              "when you press Play; rebuild it here if something looks wrong.",
-              "Los shaders se preparan antes de la primera carrera para que no haya tirones. Se hace solo "
-              "al pulsar Jugar; aquí puedes rehacerlo si algo va mal."));
-  if (app.NeedsWarmup()) {
-    StatusDot(kWarn);
-    ImGui::TextUnformatted(L("Will be prepared when you press Play", "Se preparará al pulsar Jugar"));
-  } else {
-    StatusDot(kOk);
-    ImGui::TextUnformatted(L("Ready", "Lista"));
-  }
-  ImGui::BeginDisabled(app.TaskRunning() || app.game || !app.Installed());
-  if (ImGui::Button(L("Prepare shaders now", "Preparar shaders ahora"), ImVec2(S(220), 0))) {
-    app.StartWarmup(false);
-  }
-  ImGui::EndDisabled();
-  EndCard();
+
 }
 
 constexpr const char* kKofiUrl = "https://ko-fi.com/post/Forza-Motorsport-2-native-on-PC-E2Q428PZ5Y";
 
 void TabSupport() {
   BeginCard("##support", L("Support the project", "Apoya el proyecto"));
-  TextDim(L("This port is a free project made in my spare time. If you enjoy playing Forza Motorsport 2 "
+  TextDim(L("These ports are free projects made in my spare time. If you enjoy playing Forza Motorsport "
             "natively on PC and want it to keep improving, you can support it on Ko-fi. Every "
             "contribution helps me put more hours into it.",
-            "Este port es un proyecto gratuito hecho en mi tiempo libre. Si disfrutas jugando a Forza "
-            "Motorsport 2 nativo en PC y quieres que siga mejorando, puedes apoyarlo en Ko-fi. Cada "
+            "Estos ports son proyectos gratuitos hechos en mi tiempo libre. Si disfrutas jugando a Forza "
+            "Motorsport nativo en PC y quieres que siga mejorando, puedes apoyarlo en Ko-fi. Cada "
             "aportación me ayuda a dedicarle más horas."));
   ImGui::Dummy(ImVec2(0, S(8)));
   ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, S(10));
@@ -1629,8 +1629,8 @@ void TabBar(App& app) {
                                               {Tab::kGraphics, L("Graphics", "Gráficos")},
                                               {Tab::kControls, L("Controls", "Controles")},
                                               {Tab::kAudio, L("Language & sound", "Idioma y sonido")},
+                                              {Tab::kForzaPlus, "FM2 Plus"},
                                               {Tab::kInstall, L("Install", "Instalación")},
-                                              {Tab::kForzaPlus, "Forza Plus 2"},
                                               {Tab::kSupport, L("Support", "Apoyar")}};
   ImDrawList* dl = ImGui::GetWindowDrawList();
   ImGui::PushFont(g_bold, ImGui::GetStyle().FontSizeBase * 1.05f);
@@ -1848,6 +1848,16 @@ int main(int argc, char** argv) {
                          "shaders" / "shareable";
   app.LoadLauncherPrefs();
   app.settings.Load(app.user_config);
+  if (app.settings.game_data_root.empty()) {
+    for (auto root = app.exe_dir.parent_path(); !root.empty(); root = root.parent_path()) {
+      if (fs::exists(root / "forza2_manifest.toml") && fs::exists(root / "assets/default.xex") &&
+          fs::is_directory(root / "assets/Media")) {
+        app.settings.game_data_root = (root / "assets").u8string();
+        break;
+      }
+      if (root == root.parent_path()) break;
+    }
+  }
   app.manifest = LoadManifest(app.manifest_path);
   if (app.manifest.empty()) {
     app.notice = L("game_files.sha256 is missing next to the launcher: the game cannot be verified.",
@@ -1855,6 +1865,8 @@ int main(int argc, char** argv) {
   }
   app.RefreshProfiles();
   app.CheckGame();
+  if (app.settings.online && !app.settings.online_server.empty())
+    app.online_status.Start(app.settings.online_server);
   if (!app.Installed()) app.tab = Tab::kInstall;
 
   g_scale = SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());
@@ -1862,10 +1874,9 @@ int main(int argc, char** argv) {
   // Fixed size, set once the cover is loaded (its aspect decides the height).
   app.window = SDL_CreateWindow("Forza Motorsport 2", int(S(1200)), int(S(850)),
                                 SDL_WINDOW_HIDDEN | SDL_WINDOW_HIGH_PIXEL_DENSITY);
-  // The SDK's SDL3 is built without the 2D renderer; SDL_GPU (D3D12 on
-  // Windows, Vulkan elsewhere) is what it has.
+  // Use Vulkan for the launcher UI as well as the game.
   SDL_GPUDevice* gpu = SDL_CreateGPUDevice(
-      SDL_GPU_SHADERFORMAT_SPIRV | SDL_GPU_SHADERFORMAT_DXIL | SDL_GPU_SHADERFORMAT_MSL, false, nullptr);
+      SDL_GPU_SHADERFORMAT_SPIRV, false, "vulkan");
   if (!gpu || !SDL_ClaimWindowForGPUDevice(gpu, app.window)) {
     SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Forza2Launcher",
                              (std::string(L("Could not start the GPU: ", "No se pudo iniciar la GPU: ")) + SDL_GetError()).c_str(),
@@ -1921,12 +1932,12 @@ int main(int argc, char** argv) {
     if (a == "--screenshot-frame") screenshot_frame = std::max(4, std::atoi(argv[i + 1]));
     if (a == "--tab" || a == "--page") {
       const std::string t = argv[i + 1];
-      app.tab = t == "graphics" ? Tab::kGraphics
+      app.tab = t == "support" ? Tab::kSupport
+                : t == "graphics" ? Tab::kGraphics
                 : t == "controls" ? Tab::kControls
                 : t == "audio"    ? Tab::kAudio
                 : t == "install"  ? Tab::kInstall
                 : t == "forzaplus" ? Tab::kForzaPlus
-                : t == "support"  ? Tab::kSupport
                                   : Tab::kProfiles;
     }
   }
@@ -2060,8 +2071,8 @@ int main(int argc, char** argv) {
       case Tab::kControls: TabControls(app); break;
       case Tab::kAudio: TabAudio(app); break;
       case Tab::kInstall: TabInstall(app); break;
-      case Tab::kForzaPlus: TabForzaPlus(app); break;
       case Tab::kSupport: TabSupport(); break;
+      case Tab::kForzaPlus: TabForzaPlus(app); break;
     }
     ImGui::PopStyleVar();
     ImGui::EndChild();

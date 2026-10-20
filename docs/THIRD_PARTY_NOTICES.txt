@@ -4,7 +4,7 @@ Forza Motorsport 2 - Native PC Port: third-party notices
 This program includes software from the projects below, under their licenses.
 
 ------------------------------------------------------------------------
-ReXGlue SDK (runtime: rexruntime.dll, rexgpu-xenos.dll) - BSD 3-Clause
+ReXGlue SDK (runtime: rexruntime.dll, rexgpu-fh1.dll) - BSD 3-Clause
 https://github.com/rexglue/rexglue-sdk
 Includes portions derived from the Xenia project (https://xenia.jp).
 ------------------------------------------------------------------------
@@ -128,3 +128,6 @@ Microsoft Visual C++ Redistributable (vcruntime140*.dll, msvcp140*.dll,
 concrt140.dll, vccorlib140.dll) - redistributed under the Microsoft
 Visual Studio license terms for redistributable code.
 ------------------------------------------------------------------------
+
+The license texts of glslang, Vulkan Memory Allocator (rexgpu-fh1.dll),
+spdlog and {fmt} (rexruntime.dll) follow.

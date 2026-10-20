@@ -47,18 +47,19 @@ extern "C" void sub_8236CB28(PPCContext& __restrict ctx, uint8_t* base) {
     auto sorted = stats.frame_ms;
     std::sort(sorted.begin(), sorted.end());
     float sum = 0;
-    int over60 = 0, over30 = 0;
+    int over120 = 0, over60 = 0, over30 = 0;
     for (float ms : sorted) {
       sum += ms;
+      over120 += ms > 10.0f;
       over60 += ms > 17.5f;
       over30 += ms > 34.0f;
     }
     const size_t n = sorted.size();
     REXLOG_WARN(
         "frame stats: {} frames in {:.1f}s = {:.1f} fps | avg {:.2f} ms, p99 {:.2f} ms, max {:.2f} ms | "
-        ">1/60s: {} | >1/30s: {}",
+        ">10ms: {} | >1/60s: {} | >1/30s: {}",
         n, window_s, float(n) / window_s, sum / float(n), sorted[std::min(n - 1, n * 99 / 100)],
-        sorted.back(), over60, over30);
+        sorted.back(), over120, over60, over30);
     stats.frame_ms.clear();
     stats.window_start = now;
   }

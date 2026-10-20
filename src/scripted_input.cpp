@@ -8,6 +8,7 @@
 //
 // File format, one line: buttons=<hex> lt=<0-255> rt=<0-255> lx=<int16> ly=<int16> rx=<int16> ry=<int16>
 #include <chrono>
+#include <atomic>
 #include <cstdio>
 #include <cstring>
 #include <mutex>
@@ -23,6 +24,9 @@
 
 REXCVAR_DEFINE_STRING(scripted_input, "", "Forza2",
                       "Path of a pad-state file merged into controller 0 (automation)");
+
+REXCVAR_DEFINE_BOOL(scripted_input_exclusive, false, "Forza2",
+                    "Use only the scripted controller for isolated lab instances");
 
 namespace {
 
@@ -87,7 +91,7 @@ extern "C" void __imp__XamInputGetState(PPCContext& __restrict ctx, uint8_t* bas
   auto* buttons = reinterpret_cast<rex::be<uint16_t>*>(base + state_ptr + 4);
   uint8_t* triggers = base + state_ptr + 6;
   auto* sticks = reinterpret_cast<rex::be<int16_t>*>(base + state_ptr + 8);
-  if (ctx.r3.u32 != 0) {
+  if (ctx.r3.u32 != 0 || REXCVAR_GET(scripted_input_exclusive)) {
     // No physical pad on slot 0: present a clean one.
     std::memset(base + state_ptr, 0, 16);
   }
@@ -98,6 +102,7 @@ extern "C" void __imp__XamInputGetState(PPCContext& __restrict ctx, uint8_t* bas
   for (int i = 0; i < 4; ++i) {
     if (axes[i]) sticks[i] = axes[i];
   }
-  *packet = uint32_t(*packet) + 1;
+  static std::atomic<uint32_t> scripted_packet{0};
+  *packet = REXCVAR_GET(scripted_input_exclusive) ? ++scripted_packet : uint32_t(*packet) + 1;
   ctx.r3.u64 = 0;  // ERROR_SUCCESS
 }

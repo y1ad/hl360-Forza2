@@ -1,0 +1,147 @@
+--- a/src/graphics/vulkan/pipeline_cache.cpp
++++ b/src/graphics/vulkan/pipeline_cache.cpp
+@@ -12,6 +12,7 @@
+ #include <algorithm>
+ #include <array>
+ #include <atomic>
++#include <chrono>
+ #include <cstdint>
+ #include <cstring>
+ #include <memory>
+@@ -54,6 +55,13 @@
+     "Number of pipeline creation threads for Vulkan async pipeline creation (-1 for auto)")
+     .range(-1, 32)
+     .lifecycle(rex::cvar::Lifecycle::kRequiresRestart);
++
++REXCVAR_DEFINE_BOOL(vulkan_async_pipeline_submission_wait, true, "GPU/Vulkan",
++                    "Drain and wait for pipeline compilation at submission end even in async mode");
++REXCVAR_DEFINE_BOOL(vulkan_async_pipeline_skip_pending, false, "GPU/Vulkan",
++                    "Queue new real pipelines without synchronously compiling discarded placeholders");
++REXCVAR_DEFINE_BOOL(vulkan_pipeline_stall_diagnostics, false, "GPU/Vulkan",
++                    "Report pipeline submission blocking time every five seconds");
+ 
+ REXCVAR_DEFINE_BOOL(vulkan_tessellation_wireframe, false, "GPU/Vulkan",
+                     "Render tessellation as wireframe")
+@@ -761,6 +769,9 @@
+ }
+ 
+ void VulkanPipelineCache::EndSubmission() {
++  const bool diagnose = REXCVAR_GET(vulkan_pipeline_stall_diagnostics);
++  const auto diagnostic_start = diagnose ? std::chrono::steady_clock::now()
++                                        : std::chrono::steady_clock::time_point{};
+   if (shader_storage_file_flush_needed_ || pipeline_storage_file_flush_needed_) {
+     {
+       std::lock_guard<std::mutex> lock(storage_write_request_lock_);
+@@ -778,12 +789,18 @@
+ 
+   if (!creation_threads_.empty()) {
+     bool startup_loading = false;
++    bool queued_work = false;
+     {
+       std::lock_guard<std::mutex> lock(creation_request_lock_);
+       startup_loading = startup_loading_;
+-    }
+-    if (startup_loading) {
+-      creation_request_cond_.notify_one();
++      queued_work = !creation_queue_.empty();
++    }
++    if (startup_loading || (REXCVAR_GET(async_shader_compilation) &&
++                            !REXCVAR_GET(vulkan_async_pipeline_submission_wait))) {
++      // Async draws already have a placeholder. Let the worker replace it
++      // without draining its queue or waiting on the GPU command processor.
++      // Startup's explicit blocking warm-up is handled separately.
++      if (queued_work) creation_request_cond_.notify_all();
+     } else {
+       // Help worker threads on the processor thread to reduce warm-up latency.
+       CreateQueuedPipelinesOnProcessorThread();
+@@ -806,6 +823,25 @@
+   }
+ 
+   ProcessDeferredPipelineDestructions(false);
++  if (diagnose) {
++    using Clock = std::chrono::steady_clock;
++    static thread_local auto window = Clock::now();
++    static thread_local uint64_t calls = 0, slow = 0;
++    static thread_local double total_ms = 0, worst_ms = 0;
++    const auto now = Clock::now();
++    const double ms = std::chrono::duration<double, std::milli>(now - diagnostic_start).count();
++    ++calls;
++    slow += ms > 1.0;
++    total_ms += ms;
++    worst_ms = std::max(worst_ms, ms);
++    if (now - window >= std::chrono::seconds(5)) {
++      REXGPU_WARN("pipeline submission stats: {} calls, {} over 1ms, total {:.2f}ms, max {:.2f}ms",
++                  calls, slow, total_ms, worst_ms);
++      calls = slow = 0;
++      total_ms = worst_ms = 0;
++      window = now;
++    }
++  }
+ }
+ 
+ void VulkanPipelineCache::Shutdown() {
+@@ -1151,6 +1187,16 @@
+   auto it = pipelines_.find(description);
+   if (it != pipelines_.end()) {
+     VkPipeline found_pipeline = it->second.pipeline.load(std::memory_order_acquire);
++    if (found_pipeline == VK_NULL_HANDLE && use_async &&
++        REXCVAR_GET(vulkan_async_pipeline_skip_pending) &&
++        it->second.is_placeholder.load(std::memory_order_acquire)) {
++      // The command processor already skips pending draws by this handle.
++      last_pipeline_ = &*it;
++      pipeline_out = VK_NULL_HANDLE;
++      pipeline_layout_out = nullptr;
++      if (pipeline_handle_out) *pipeline_handle_out = &it->second;
++      return true;
++    }
+     if (found_pipeline == VK_NULL_HANDLE) {
+       PipelineCreationArguments creation_arguments;
+       if (!TryGetPipelineCreationArgumentsForDescription(description, &*it, creation_arguments) ||
+@@ -1180,7 +1226,18 @@
+   }
+ 
+   bool queued_async_creation = false;
+-  if (use_async) {
++  if (use_async && REXCVAR_GET(vulkan_async_pipeline_skip_pending)) {
++    // PerformDraw skips every placeholder draw before binding it, so a real
++    // placeholder VkPipeline is redundant and stalls the render thread.
++    creation_arguments_real.priority = async_priority;
++    pipeline.second.is_placeholder.store(true, std::memory_order_release);
++    {
++      std::lock_guard<std::mutex> lock(creation_request_lock_);
++      creation_queue_.push(creation_arguments_real);
++    }
++    creation_request_cond_.notify_one();
++    queued_async_creation = true;
++  } else if (use_async) {
+     creation_arguments_real.priority = async_priority;
+     PipelineCreationArguments creation_arguments_placeholder;
+     if (TryGetPipelineCreationArgumentsForDescription(description, &pipeline,
+@@ -1225,7 +1282,8 @@
+   if (pipeline_handle_out) {
+     *pipeline_handle_out = &pipeline.second;
+   }
+-  return pipeline_out != VK_NULL_HANDLE && pipeline_layout_out != nullptr;
++  return queued_async_creation ||
++         (pipeline_out != VK_NULL_HANDLE && pipeline_layout_out != nullptr);
+ }
+ 
+ bool VulkanPipelineCache::IsCreatingPipelines() const {
+@@ -3696,6 +3754,8 @@
+       } else {
+         creation_arguments.pipeline->second.pipeline.store(VK_NULL_HANDLE,
+                                                            std::memory_order_release);
++        creation_arguments.pipeline->second.is_placeholder.store(false,
++                                                                 std::memory_order_release);
+       }
+     }
+ 
+@@ -3729,6 +3789,8 @@
+       } else {
+         creation_arguments.pipeline->second.pipeline.store(VK_NULL_HANDLE,
+                                                            std::memory_order_release);
++        creation_arguments.pipeline->second.is_placeholder.store(false,
++                                                                 std::memory_order_release);
+       }
+     }
+   }

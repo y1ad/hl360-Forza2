@@ -8,6 +8,17 @@ project(forza2 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Use the same patched source SDK as the FM4 Vulkan build; the release SDK
+# is D3D12-only and cannot provide the ABI-2 fh1 plugin.
+if(NOT REXSDK_DIR)
+    get_filename_component(REXSDK_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../fm4-recomp/work/vulkan-trial/shiftglue-sdk" ABSOLUTE)
+endif()
+if(NOT EXISTS "${REXSDK_DIR}/CMakeLists.txt")
+    message(FATAL_ERROR "Set REXSDK_DIR to the patched Vulkan SDK source used by FM4")
+endif()
+set(REXGLUE_USE_VULKAN ON CACHE BOOL "" FORCE)
+set(REXGLUE_USE_D3D12 OFF CACHE BOOL "" FORCE)
+set(REXGLUE_ENABLE_TRACY OFF CACHE BOOL "" FORCE)
 include(generated/rexglue.cmake)
 
 # The build runs `rexglue codegen` on assets/default.xex first. The game is not
@@ -30,6 +41,7 @@ endif()
 set(FORZA2_SOURCES
     src/main.cpp
     src/profile.cpp
+    src/lan.cpp
     src/crash_report.cpp
     src/stream_guard.cpp
     src/diag_hooks.cpp
@@ -46,9 +58,10 @@ else()
     add_executable(forza2 ${FORZA2_SOURCES})
 endif()
 
-rexglue_setup_target(forza2 GPU_PLUGINS xenos)
+rexglue_setup_target(forza2 GPU_PLUGINS fh1)
+target_include_directories(forza2 PRIVATE "${REXSDK_DIR}/thirdparty/imgui")
 if(WIN32)
-    target_link_libraries(forza2 PRIVATE dbghelp)
+    target_link_libraries(forza2 PRIVATE dbghelp ws2_32 bcrypt)
 endif()
 
 # Launcher: profiles, settings, ISO import (launcher/).

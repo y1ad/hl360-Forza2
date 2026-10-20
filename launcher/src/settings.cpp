@@ -1,6 +1,7 @@
 #include "settings.h"
 
 #include <fstream>
+#include <algorithm>
 
 #include <toml++/toml.hpp>
 
@@ -46,6 +47,15 @@ void Read(const toml::table& t, const char* key, T& out) {
 
 Settings::Settings() { ResetBinds(); }
 
+void Settings::ApplyGraphicsPreset(int preset) {
+  graphics_preset = std::clamp(preset, 0, 3);
+  if (graphics_preset == 3) return;
+  resolution_scale = graphics_preset == 0 ? 1 : 2;
+  anisotropic_override = 3 + graphics_preset;
+  present_effect = graphics_preset == 2 ? "bilinear" : "fsr";
+  swap_post_effect = "none";
+}
+
 void Settings::ResetBinds() {
   binds.assign(std::begin(kDefaultBinds), std::end(kDefaultBinds));
   for (auto& b : binds) b.keys = b.default_keys;
@@ -54,6 +64,8 @@ void Settings::ResetBinds() {
 void Settings::ResetDisplay() {
   Settings defaults;
   fullscreen = defaults.fullscreen;
+  vsync = defaults.vsync;
+  experimental_120fps = defaults.experimental_120fps;
   monitor = defaults.monitor;
   window_width = defaults.window_width;
   window_height = defaults.window_height;
@@ -64,6 +76,7 @@ void Settings::ResetDisplay() {
   native_2x_msaa = defaults.native_2x_msaa;
   swap_post_effect = defaults.swap_post_effect;
   present_effect = defaults.present_effect;
+  ApplyGraphicsPreset(2);
 }
 
 bool Settings::Load(const std::filesystem::path& file) {
@@ -84,18 +97,27 @@ bool Settings::Load(const std::filesystem::path& file) {
   Read(t, "monitor", v), monitor = int(v);
   v = window_width, Read(t, "window_width", v), window_width = v > 0 ? int(v) : window_width;
   v = window_height, Read(t, "window_height", v), window_height = v > 0 ? int(v) : window_height;
-  // Older files may carry vsync = false (unpaced); that is not offered any
-  // more, so only the refresh rate is read, snapped to the offered values.
-  double hz = refresh_rate;
+  Read(t, "vsync", vsync);
+  double hz = 60.0;
   Read(t, "video_mode_refresh_rate", hz);
-  refresh_rate = hz >= 90 ? 120 : 60;
+  experimental_120fps = hz == 120.0;
+  refresh_rate = experimental_120fps ? 120 : 60;
   Read(t, "present_letterbox", present_letterbox);
 
   v = resolution_scale, Read(t, "resolution_scale", v), resolution_scale = int(v);
   v = anisotropic_override, Read(t, "anisotropic_override", v), anisotropic_override = int(v);
-  Read(t, "native_2x_msaa", native_2x_msaa);
+  // FM2 keeps its native MSAA path enabled; no separate technical toggle.
+  native_2x_msaa = true;
+  if (resolution_scale < 1 || resolution_scale > 4) resolution_scale = 1;
+  if (anisotropic_override < 0 || anisotropic_override > 5) anisotropic_override = 3;
   Read(t, "swap_post_effect", swap_post_effect);
   Read(t, "present_effect", present_effect);
+  if (present_effect != "bilinear" && present_effect != "cas" && present_effect != "fsr")
+    present_effect = "fsr";
+  swap_post_effect = "none";
+  int64_t preset = 3; // Preserve legacy individual settings as Custom.
+  Read(t, "graphics_preset", preset);
+  ApplyGraphicsPreset(int(std::clamp<int64_t>(preset, 0, 3)));
 
   Read(t, "input_backend", input_backend);
   Read(t, "mnk_mode", mnk_mode);
@@ -105,6 +127,12 @@ bool Settings::Load(const std::filesystem::path& file) {
     Read(t, (std::string("keybind_") + b.id).c_str(), b.keys);
   }
   Read(t, "audio_mute", audio_mute);
+  // Profiles saved before online play have no fm2_relay: keep the default.
+  if (auto relay = t["fm2_relay"].value<std::string>()) {
+    online = !relay->empty();
+    // The build's server wins, so a server move only needs a new launcher.
+    if (online && online_server.empty()) online_server = *relay;
+  }
   return true;
 }
 
@@ -114,19 +142,64 @@ bool Settings::Save(const std::filesystem::path& file) const {
   t.insert("gamertag", gamertag);
   t.insert("user_language", user_language);
 
+  t.insert("gpu_plugin", "fh1");
+  t.insert("gpu_backend", "vulkan");
+  // FM2 Xenia Vulkan profile: generic framebuffers, no FH1 native executor.
+  t.insert("clear_memory_page_state", false);
+  t.insert("depth_float24_convert_in_pixel_shader", false);
+  t.insert("depth_float24_round", false);
+  t.insert("draw_resolution_scaled_texture_offsets", true);
+  t.insert("gpu_3d_to_2d_texture", true);
+  t.insert("gpu_allow_invalid_fetch_constants", true);
+  t.insert("readback_memexport", false);
+  t.insert("readback_resolve", "none");
+  t.insert("readback_resolve_half_pixel_offset", false);
+  t.insert("resolve_resolution_scale_fill_half_pixel_offset", true);
+  t.insert("use_fuzzy_alpha_epsilon", false);
+  t.insert("depth_transfer_not_equal_test", true);
+  t.insert("execute_unclipped_draw_vs_on_cpu", true);
+  t.insert("execute_unclipped_draw_vs_on_cpu_for_psi_render_backend", true);
+  t.insert("execute_unclipped_draw_vs_on_cpu_with_scissor", false);
+  t.insert("gamma_render_target_as_unorm16", true);
+  t.insert("half_pixel_offset", true);
+  t.insert("mrt_edram_used_range_clamp_to_min", true);
+  t.insert("non_seamless_cube_map", true);
+  t.insert("snorm16_render_target_full_range", true);
+  t.insert("store_shaders", true);
+  t.insert("texture_cache_memory_limit_hard", 768);
+  t.insert("texture_cache_memory_limit_render_to_texture", 24);
+  t.insert("texture_cache_memory_limit_soft", 384);
+  t.insert("texture_cache_memory_limit_soft_lifetime", 30);
+  t.insert("vulkan_allow_present_mode_fifo_relaxed", true);
+  t.insert("vulkan_allow_present_mode_immediate", true);
+  t.insert("vulkan_allow_present_mode_mailbox", true);
+  t.insert("vulkan_depth_bias_force_unorm", true);
+  t.insert("vulkan_pipeline_creation_threads", -1);
+  t.insert("vulkan_sparse_shared_memory", true);
+  t.insert("vulkan_fh1_native_executor", false);
+  t.insert("render_target_path_vulkan", "fbo");
+  t.insert("fh1_scaled_msaa_single_sample", false);
+  t.insert("host_present_fps_limit", experimental_120fps ? 120 : 60);
+  t.insert("fh1_color_overwrite_claims", false);
+  t.insert("fh1_scrambled_stencil_claims", false);
+  t.insert("fh1_surfaceless_clears", false);
   t.insert("fullscreen", fullscreen);
   t.insert("monitor", monitor);
   t.insert("window_width", window_width);
   t.insert("window_height", window_height);
-  t.insert("vsync", true);
-  t.insert("video_mode_refresh_rate", double(refresh_rate));
+  t.insert("vsync", vsync);
+  t.insert("video_mode_refresh_rate", experimental_120fps ? 120.0 : 60.0);
   t.insert("present_letterbox", present_letterbox);
 
   t.insert("resolution_scale", resolution_scale);
   t.insert("anisotropic_override", anisotropic_override);
-  t.insert("native_2x_msaa", native_2x_msaa);
-  t.insert("swap_post_effect", swap_post_effect);
+  t.insert("native_2x_msaa", true);
+  t.insert("swap_post_effect", "none");
   t.insert("present_effect", present_effect);
+  t.insert("graphics_preset", graphics_preset);
+  t.insert("video_mode_width", 1280);
+  t.insert("video_mode_height", 720);
+  t.insert("present_fsr_sharpness_reduction", 0.2);
 
   t.insert("input_backend", input_backend);
   t.insert("mnk_mode", mnk_mode);
@@ -135,7 +208,16 @@ bool Settings::Save(const std::filesystem::path& file) const {
   for (const auto& b : binds) {
     t.insert(std::string("keybind_") + b.id, b.keys);
   }
+  // Same asynchronous Vulkan pipeline policy as the new FM4 runtime.
+  t.insert("async_shader_compilation", true);
+  // Keep first-use driver compilation off the render thread.
+  t.insert("vulkan_async_pipeline_submission_wait", false);
+  t.insert("vulkan_async_pipeline_skip_pending", true);
+  t.insert("frame_stats", false);
+  // FM2 has no render-readback requirement like FM3/FM4's road/thumbnail path.
+  t.insert("audio_maxqframes", 24);
   t.insert("audio_mute", audio_mute);
+  t.insert("fm2_relay", online && !online_server.empty() ? online_server : std::string());
 
   std::ofstream out(file, std::ios::trunc);
   if (!out) return false;

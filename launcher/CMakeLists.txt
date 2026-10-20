@@ -25,6 +25,7 @@ add_executable(Forza2Launcher WIN32
     src/settings.cpp
     src/sha256.cpp
     src/forza_plus.cpp
+    src/online_status.cpp
     ${miniz_SOURCE_DIR}/miniz.c
     ${imgui_SOURCE_DIR}/imgui.cpp
     ${imgui_SOURCE_DIR}/imgui_draw.cpp
@@ -35,8 +36,13 @@ add_executable(Forza2Launcher WIN32
 
 # The SDK include dir also carries an (older) imgui.h: keep ours first.
 target_include_directories(Forza2Launcher BEFORE PRIVATE
-    ${imgui_SOURCE_DIR} ${imgui_SOURCE_DIR}/backends ${miniz_SOURCE_DIR})
-target_link_libraries(Forza2Launcher PRIVATE SDL3::SDL3-static)
+    ${imgui_SOURCE_DIR} ${imgui_SOURCE_DIR}/backends ${miniz_SOURCE_DIR} "${REXSDK_DIR}/thirdparty/tomlplusplus/include")
+target_link_libraries(Forza2Launcher PRIVATE SDL3::SDL3-static ws2_32)
+# Online server (host:port) baked into release launchers; kept out of the sources.
+set(FM2_ONLINE_SERVER "" CACHE STRING "Default FM2 relay server for the launcher")
+if(FM2_ONLINE_SERVER)
+  target_compile_definitions(Forza2Launcher PRIVATE FM2_ONLINE_SERVER="${FM2_ONLINE_SERVER}")
+endif()
 # C++17: path::u8string() returns std::string there (C++20 made it u8string).
 set_target_properties(Forza2Launcher PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
 
@@ -46,7 +52,9 @@ set_target_properties(Forza2Launcher PROPERTIES
 add_custom_command(TARGET Forza2Launcher POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${CMAKE_CURRENT_SOURCE_DIR}/data/game_files.sha256
-        $<TARGET_FILE_DIR:forza2>/game_files.sha256)
+        $<TARGET_FILE_DIR:forza2>/game_files.sha256
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${PROJECT_SOURCE_DIR}/config/forza2.toml $<TARGET_FILE_DIR:forza2>/forza2.toml)
 
 # Box art shown in the launcher's left column. It is copyrighted, so it is not
 # in the repository: drop your own data/cover.png to have it copied (without

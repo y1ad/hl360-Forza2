@@ -7,25 +7,88 @@
 # so a log file only stays around when something went wrong.
 log_level = "warning"
 
-# Twice the SDK default (8) of queued audio frames: absorbs hitches instead of
-# crackling. ~5 ms per frame, so ~85 ms of buffer.
-audio_maxqframes = 16
+# Up to 24 x 256 samples at 48 kHz (~128 ms) to absorb short scheduling hitches.
+# Eight more blocks than before add ~43 ms of maximum queue latency.
+audio_maxqframes = 24
 
-# Async pipeline compilation skips presents and draws untextured placeholders
-# on every title the CrownPark ports tried; start synchronous.
-async_shader_compilation = false
+# FM2 Xenia profile uses asynchronous pipeline compilation.
+async_shader_compilation = true
 
 # Engines routinely issue fetches the strict path rejects.
-gpu_allow_invalid_fetch_constants = true
 
 # Answer system UI (device selector, sign-in) with defaults. The profile comes
 # from the launcher, so there is nothing to choose in-game.
 headless = true
 
-# The Xenos GPU backend (D3D12 on Windows, Vulkan elsewhere); CMake stages
-# rexgpu-xenos*.dll next to the exe. Without it every Vd* call is ignored.
-gpu_plugin = "xenos"
+# The same patched Vulkan plugin and runtime used by the new FM4 build.
+gpu_plugin = "fh1"
+gpu_backend = "vulkan"
 
 # Keyboard as a virtual pad unless the launcher says otherwise. A controller
 # works either way.
 mnk_mode = true
+
+# Port-managed defaults, matching the shared launcher policy.
+vsync = false
+video_mode_refresh_rate = 60.0
+native_2x_msaa = true
+frame_stats = false
+
+# Xenia reference adapted to ReXGlue names, from the specific FM2 Xenia profile.
+# draw_resolution_scale_x/y -> resolution_scale; postprocess FSR -> present_effect.
+resolution_scale = 2
+anisotropic_override = 5
+swap_post_effect = "none"
+present_effect = "bilinear"
+present_fsr_sharpness_reduction = 0.2
+present_letterbox = true
+video_mode_width = 1280
+video_mode_height = 720
+
+# Host presentation limit; independent of Xenia's framerate_limit.
+host_present_fps_limit = 60
+fh1_color_overwrite_claims = false
+fh1_scrambled_stencil_claims = false
+fh1_surfaceless_clears = false
+
+# FM2 Xenia settings, mapped only to supported runtime flags.
+# FM2 Xenia Vulkan uses automatic render targets (generic framebuffers),
+# using generic framebuffers as Xenia does, without the FH1 native executor.
+clear_memory_page_state = false
+depth_float24_convert_in_pixel_shader = false
+depth_float24_round = false
+draw_resolution_scaled_texture_offsets = true
+gpu_3d_to_2d_texture = true
+gpu_allow_invalid_fetch_constants = true
+readback_memexport = false
+readback_resolve = "none"
+readback_resolve_half_pixel_offset = false
+resolve_resolution_scale_fill_half_pixel_offset = true
+use_fuzzy_alpha_epsilon = false
+depth_transfer_not_equal_test = true
+execute_unclipped_draw_vs_on_cpu = true
+execute_unclipped_draw_vs_on_cpu_for_psi_render_backend = true
+execute_unclipped_draw_vs_on_cpu_with_scissor = false
+gamma_render_target_as_unorm16 = true
+half_pixel_offset = true
+mrt_edram_used_range_clamp_to_min = true
+non_seamless_cube_map = true
+snorm16_render_target_full_range = true
+store_shaders = true
+texture_cache_memory_limit_hard = 768
+texture_cache_memory_limit_render_to_texture = 24
+texture_cache_memory_limit_soft = 384
+texture_cache_memory_limit_soft_lifetime = 30
+vulkan_allow_present_mode_fifo_relaxed = true
+vulkan_allow_present_mode_immediate = true
+vulkan_allow_present_mode_mailbox = true
+vulkan_depth_bias_force_unorm = true
+vulkan_pipeline_creation_threads = -1
+vulkan_sparse_shared_memory = true
+vulkan_fh1_native_executor = false
+render_target_path_vulkan = "fbo"
+fh1_scaled_msaa_single_sample = false
+
+# Compile new pipelines on workers; do not build unused placeholders on the render thread.
+vulkan_async_pipeline_submission_wait = false
+vulkan_async_pipeline_skip_pending = true

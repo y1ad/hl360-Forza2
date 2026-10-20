@@ -28,23 +28,24 @@ struct Settings {
 
   // Display
   bool fullscreen = true;
+  bool vsync = false;
+  bool experimental_120fps = false;
   int monitor = 0;
   int window_width = 1600;
   int window_height = 900;
-  // Guest video refresh (video_mode_refresh_rate): 60 or 120 Hz. The title
-  // paces itself on those vblanks; `vsync` always stays on, since without it
-  // the runtime fires a vblank every millisecond and the game runs unpaced,
-  // with constant hitches. 144 Hz is not offered: the title then waits two
-  // vblanks per frame in races (72 fps target) and held only 52-56 fps.
+  // Guest timing follows the launcher frame-rate selection.
   int refresh_rate = 60;
   bool present_letterbox = true;
 
   // Quality
-  int resolution_scale = 1;      // internal render scale over 1280x720
-  int anisotropic_override = 3;  // -1 off-override, 0..5 = off,1x,2x,4x,8x,16x
-  bool native_2x_msaa = true;
+  int resolution_scale = 2;      // internal render scale over 1280x720
+  int anisotropic_override = 5;  // 0..5 = off,1x,2x,4x,8x,16x
+  bool native_2x_msaa = true;  // Internal FM2 compatibility setting.
   std::string swap_post_effect = "none";   // none | fxaa | fxaa_extreme
   std::string present_effect = "bilinear";  // bilinear | cas | fsr
+
+  int graphics_preset = 2;
+  void ApplyGraphicsPreset(int preset);
 
   // Input
   std::string input_backend = "sdl";  // sdl | xinput
@@ -55,6 +56,17 @@ struct Settings {
 
   // Audio
   bool audio_mute = false;
+
+  // Online: System Link tunnelled through the FM2 relay (tools/fm2-relay).
+  // Saved as the game's fm2_relay cvar; empty means offline. The server is a
+  // build setting (-DFM2_ONLINE_SERVER=host:port) so it stays out of the
+  // public sources; builds without it have no online option.
+  bool online = true;
+  std::string online_server = kDefaultOnlineServer;
+#ifndef FM2_ONLINE_SERVER
+#define FM2_ONLINE_SERVER ""
+#endif
+  static constexpr const char* kDefaultOnlineServer = FM2_ONLINE_SERVER;
 
   Settings();
   void ResetBinds();

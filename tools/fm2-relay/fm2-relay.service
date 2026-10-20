@@ -1,0 +1,24 @@
+[Unit]
+Description=FM2 System Link relay (Forza Motorsport 2 port online play)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/bin/python3 -u /opt/fm2-relay/fm2_relay.py --port 23020
+Restart=always
+RestartSec=2
+User=fm2relay
+Group=fm2relay
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+MemoryMax=256M
+
+[Install]
+WantedBy=multi-user.target
