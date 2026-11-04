@@ -53,6 +53,14 @@ jobs:
             echo "::warning::vulkan-async-pipelines.patch does not apply; building the SDK as it is"
           fi
 
+      - name: Align the committed generated code with this SDK
+        # The committed generated/ code was made by SDK 0.10.0, whose headers
+        # declare the function table non-const; this SDK declares it const.
+        run: |
+          cd forza2/generated/default
+          grep -rlE 'PPCFuncMapping PPCFuncMappings' . | xargs -r sed -i -E 's/^(extern )?PPCFuncMapping PPCFuncMappings/\1const PPCFuncMapping PPCFuncMappings/'
+          grep -rnE 'PPCFuncMappings' . | cut -c1-160 | head
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -136,11 +144,11 @@ jobs:
           {
             echo "run: $GITHUB_RUN_ID  commit: $GITHUB_SHA"
             echo "== errors =="
-            grep -nE "error:|FAILED:|CMake Error|undefined (symbol|reference)|fatal error|No such file" forza2/build/*.log 2>/dev/null | head -150
-            echo "== tail of the build log =="
-            tail -n 120 forza2/build/build.log 2>/dev/null
+            grep -nE "error:|FAILED:|CMake Error|undefined (symbol|reference)|fatal error|No such file" forza2/build/*.log 2>/dev/null | cut -c1-400 | head -150
+            echo "== tail of the build log (errors and notes only) =="
+            grep -vE "warning:|^ +[0-9]+ \||^ +\||\^" forza2/build/build.log 2>/dev/null | tail -n 80
             echo "== tail of the configure log =="
-            tail -n 60 forza2/build/configure.log 2>/dev/null
+            tail -n 40 forza2/build/configure.log 2>/dev/null
           } > /tmp/logs/last-failure.txt || true
           url="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
           git clone --depth 1 --branch android-logs "$url" /tmp/logrepo 2>/dev/null || {
