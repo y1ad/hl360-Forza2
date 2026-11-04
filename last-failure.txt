@@ -1,0 +1,186 @@
+run: 41763548745  commit: a0d57e7358d5326ad41101b7eca95557782902d6
+== errors ==
+forza2/build/build.log:4422:FAILED: [code=1] CMakeFiles/forza2_recomp.dir/cmake_pch.hxx.pch 
+forza2/build/build.log:4426:/home/runner/work/hl360-Forza2/hl360-Forza2/forza2/generated/default/forza2_pch.h:45:23: error: redeclaration of 'PPCFuncMappings' with a different type: 'PPCFuncMapping[]' vs 'const PPCFuncMapping[]'
+== tail of the build log ==
+      |                                                                           ^
+/home/runner/work/hl360-Forza2/hl360-Forza2/sdk/src/graphics/vulkan/texture_cache.cpp:408:40: warning: missing field 'unsigned_signed_compatible' initializer [-Wmissing-field-initializers]
+  408 |      xenos::XE_GPU_TEXTURE_SWIZZLE_RGBB},
+      |                                        ^
+/home/runner/work/hl360-Forza2/hl360-Forza2/sdk/src/graphics/vulkan/texture_cache.cpp:412:70: warning: missing field 'block_compressed' initializer [-Wmissing-field-initializers]
+  412 |     {{kLoadShaderIndexR10G11B11ToRGBA16, VK_FORMAT_R16G16B16A16_UNORM},
+      |                                                                      ^
+/home/runner/work/hl360-Forza2/hl360-Forza2/sdk/src/graphics/vulkan/texture_cache.cpp:413:75: warning: missing field 'block_compressed' initializer [-Wmissing-field-initializers]
+  413 |      {kLoadShaderIndexR10G11B11ToRGBA16SNorm, VK_FORMAT_R16G16B16A16_SNORM},
+      |                                                                           ^
+/home/runner/work/hl360-Forza2/hl360-Forza2/sdk/src/graphics/vulkan/texture_cache.cpp:414:40: warning: missing field 'unsigned_signed_compatible' initializer [-Wmissing-field-initializers]
+  414 |      xenos::XE_GPU_TEXTURE_SWIZZLE_RGBB},
+      |                                        ^
+/home/runner/work/hl360-Forza2/hl360-Forza2/sdk/src/graphics/vulkan/texture_cache.cpp:416:30: warning: missing field 'format' initializer [-Wmissing-field-initializers]
+  416 |     {{kLoadShaderIndexUnknown}, {kLoadShaderIndexUnknown}, xenos::XE_GPU_TEXTURE_SWIZZLE_RGBB},
+      |                              ^
+/home/runner/work/hl360-Forza2/hl360-Forza2/sdk/src/graphics/vulkan/texture_cache.cpp:416:57: warning: missing field 'format' initializer [-Wmissing-field-initializers]
+  416 |     {{kLoadShaderIndexUnknown}, {kLoadShaderIndexUnknown}, xenos::XE_GPU_TEXTURE_SWIZZLE_RGBB},
+      |                                                         ^
+/home/runner/work/hl360-Forza2/hl360-Forza2/sdk/src/graphics/vulkan/texture_cache.cpp:416:94: warning: missing field 'unsigned_signed_compatible' initializer [-Wmissing-field-initializers]
+  416 |     {{kLoadShaderIndexUnknown}, {kLoadShaderIndexUnknown}, xenos::XE_GPU_TEXTURE_SWIZZLE_RGBB},
+      |                                                                                              ^
+/home/runner/work/hl360-Forza2/hl360-Forza2/sdk/src/graphics/vulkan/texture_cache.cpp:418:48: warning: missing field 'block_compressed' initializer [-Wmissing-field-initializers]
+  418 |     {{kLoadShaderIndexDXT3A, VK_FORMAT_R8_UNORM},
+      |                                                ^
+/home/runner/work/hl360-Forza2/hl360-Forza2/sdk/src/graphics/vulkan/texture_cache.cpp:419:30: warning: missing field 'format' initializer [-Wmissing-field-initializers]
+  419 |      {kLoadShaderIndexUnknown},
+      |                              ^
+/home/runner/work/hl360-Forza2/hl360-Forza2/sdk/src/graphics/vulkan/texture_cache.cpp:420:40: warning: missing field 'unsigned_signed_compatible' initializer [-Wmissing-field-initializers]
+  420 |      xenos::XE_GPU_TEXTURE_SWIZZLE_RRRR},
+      |                                        ^
+/home/runner/work/hl360-Forza2/hl360-Forza2/sdk/src/graphics/vulkan/texture_cache.cpp:423:61: warning: missing field 'linear_filterable' initializer [-Wmissing-field-initializers]
+  423 |     {{kLoadShaderIndex64bpb, VK_FORMAT_BC4_UNORM_BLOCK, true},
+      |                                                             ^
+/home/runner/work/hl360-Forza2/hl360-Forza2/sdk/src/graphics/vulkan/texture_cache.cpp:424:30: warning: missing field 'format' initializer [-Wmissing-field-initializers]
+  424 |      {kLoadShaderIndexUnknown},
+      |                              ^
+/home/runner/work/hl360-Forza2/hl360-Forza2/sdk/src/graphics/vulkan/texture_cache.cpp:425:40: warning: missing field 'unsigned_signed_compatible' initializer [-Wmissing-field-initializers]
+  425 |      xenos::XE_GPU_TEXTURE_SWIZZLE_RRRR},
+      |                                        ^
+/home/runner/work/hl360-Forza2/hl360-Forza2/sdk/src/graphics/vulkan/texture_cache.cpp:427:49: warning: missing field 'block_compressed' initializer [-Wmissing-field-initializers]
+  427 |     {{kLoadShaderIndexCTX1, VK_FORMAT_R8G8_UNORM},
+      |                                                 ^
+/home/runner/work/hl360-Forza2/hl360-Forza2/sdk/src/graphics/vulkan/texture_cache.cpp:428:30: warning: missing field 'format' initializer [-Wmissing-field-initializers]
+  428 |      {kLoadShaderIndexUnknown},
+      |                              ^
+/home/runner/work/hl360-Forza2/hl360-Forza2/sdk/src/graphics/vulkan/texture_cache.cpp:429:40: warning: missing field 'unsigned_signed_compatible' initializer [-Wmissing-field-initializers]
+  429 |      xenos::XE_GPU_TEXTURE_SWIZZLE_RGGG},
+      |                                        ^
+/home/runner/work/hl360-Forza2/hl360-Forza2/sdk/src/graphics/vulkan/texture_cache.cpp:431:74: warning: missing field 'block_compressed' initializer [-Wmissing-field-initializers]
+  431 |     {{kLoadShaderIndexDXT3AAs1111ToARGB4, VK_FORMAT_B4G4R4A4_UNORM_PACK16},
+      |                                                                          ^
+/home/runner/work/hl360-Forza2/hl360-Forza2/sdk/src/graphics/vulkan/texture_cache.cpp:432:30: warning: missing field 'format' initializer [-Wmissing-field-initializers]
+  432 |      {kLoadShaderIndexUnknown},
+      |                              ^
+/home/runner/work/hl360-Forza2/hl360-Forza2/sdk/src/graphics/vulkan/texture_cache.cpp:433:40: warning: missing field 'unsigned_signed_compatible' initializer [-Wmissing-field-initializers]
+  433 |      xenos::XE_GPU_TEXTURE_SWIZZLE_RGBA},
+      |                                        ^
+/home/runner/work/hl360-Forza2/hl360-Forza2/sdk/src/graphics/vulkan/texture_cache.cpp:436:30: warning: missing field 'format' initializer [-Wmissing-field-initializers]
+  436 |     {{kLoadShaderIndexUnknown}, {kLoadShaderIndexUnknown}, xenos::XE_GPU_TEXTURE_SWIZZLE_RGBA},
+      |                              ^
+/home/runner/work/hl360-Forza2/hl360-Forza2/sdk/src/graphics/vulkan/texture_cache.cpp:436:57: warning: missing field 'format' initializer [-Wmissing-field-initializers]
+  436 |     {{kLoadShaderIndexUnknown}, {kLoadShaderIndexUnknown}, xenos::XE_GPU_TEXTURE_SWIZZLE_RGBA},
+      |                                                         ^
+/home/runner/work/hl360-Forza2/hl360-Forza2/sdk/src/graphics/vulkan/texture_cache.cpp:436:94: warning: missing field 'unsigned_signed_compatible' initializer [-Wmissing-field-initializers]
+  436 |     {{kLoadShaderIndexUnknown}, {kLoadShaderIndexUnknown}, xenos::XE_GPU_TEXTURE_SWIZZLE_RGBA},
+      |                                                                                              ^
+/home/runner/work/hl360-Forza2/hl360-Forza2/sdk/src/graphics/vulkan/texture_cache.cpp:439:30: warning: missing field 'format' initializer [-Wmissing-field-initializers]
+  439 |     {{kLoadShaderIndexUnknown}, {kLoadShaderIndexUnknown}, xenos::XE_GPU_TEXTURE_SWIZZLE_RGBA},
+      |                              ^
+/home/runner/work/hl360-Forza2/hl360-Forza2/sdk/src/graphics/vulkan/texture_cache.cpp:439:57: warning: missing field 'format' initializer [-Wmissing-field-initializers]
+  439 |     {{kLoadShaderIndexUnknown}, {kLoadShaderIndexUnknown}, xenos::XE_GPU_TEXTURE_SWIZZLE_RGBA},
+      |                                                         ^
+/home/runner/work/hl360-Forza2/hl360-Forza2/sdk/src/graphics/vulkan/texture_cache.cpp:439:94: warning: missing field 'unsigned_signed_compatible' initializer [-Wmissing-field-initializers]
+  439 |     {{kLoadShaderIndexUnknown}, {kLoadShaderIndexUnknown}, xenos::XE_GPU_TEXTURE_SWIZZLE_RGBA},
+      |                                                                                              ^
+/home/runner/work/hl360-Forza2/hl360-Forza2/sdk/src/graphics/vulkan/texture_cache.cpp:447:29: warning: missing field 'format' initializer [-Wmissing-field-initializers]
+  447 |     {kLoadShaderIndexUnknown},
+      |                             ^
+/home/runner/work/hl360-Forza2/hl360-Forza2/sdk/src/graphics/vulkan/texture_cache.cpp:453:29: warning: missing field 'format' initializer [-Wmissing-field-initializers]
+  453 |     {kLoadShaderIndexUnknown},
+      |                             ^
+/home/runner/work/hl360-Forza2/hl360-Forza2/sdk/src/graphics/vulkan/texture_cache.cpp:461:29: warning: missing field 'format' initializer [-Wmissing-field-initializers]
+  461 |     {kLoadShaderIndexUnknown},
+      |                             ^
+/home/runner/work/hl360-Forza2/hl360-Forza2/sdk/src/graphics/vulkan/texture_cache.cpp:467:29: warning: missing field 'format' initializer [-Wmissing-field-initializers]
+  467 |     {kLoadShaderIndexUnknown},
+      |                             ^
+/home/runner/work/hl360-Forza2/hl360-Forza2/sdk/src/graphics/vulkan/texture_cache.cpp:473:29: warning: missing field 'format' initializer [-Wmissing-field-initializers]
+  473 |     {kLoadShaderIndexUnknown},
+      |                             ^
+/home/runner/work/hl360-Forza2/hl360-Forza2/sdk/src/graphics/vulkan/texture_cache.cpp:479:29: warning: missing field 'format' initializer [-Wmissing-field-initializers]
+  479 |     {kLoadShaderIndexUnknown},
+      |                             ^
+/home/runner/work/hl360-Forza2/hl360-Forza2/sdk/src/graphics/vulkan/texture_cache.cpp:485:29: warning: missing field 'format' initializer [-Wmissing-field-initializers]
+  485 |     {kLoadShaderIndexUnknown},
+      |                             ^
+/home/runner/work/hl360-Forza2/hl360-Forza2/sdk/src/graphics/vulkan/texture_cache.cpp:861:71: warning: missing field 'pNext' initializer [-Wmissing-field-initializers]
+  861 |   VkWriteDescriptorSet write = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+      |                                                                       ^
+/home/runner/work/hl360-Forza2/hl360-Forza2/sdk/src/graphics/vulkan/texture_cache.cpp:876:71: warning: missing field 'pNext' initializer [-Wmissing-field-initializers]
+  876 |   VkWriteDescriptorSet write = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+      |                                                                       ^
+/home/runner/work/hl360-Forza2/hl360-Forza2/sdk/src/graphics/vulkan/texture_cache.cpp:992:72: warning: missing field 'pNext' initializer [-Wmissing-field-initializers]
+  992 |       VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO};
+      |                                                                        ^
+/home/runner/work/hl360-Forza2/hl360-Forza2/sdk/src/graphics/vulkan/texture_cache.cpp:996:58: warning: missing field 'pNext' initializer [-Wmissing-field-initializers]
+  996 |       VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
+      |                                                          ^
+/home/runner/work/hl360-Forza2/hl360-Forza2/sdk/src/graphics/vulkan/texture_cache.cpp:1012:88: warning: missing field 'pNext' initializer [-Wmissing-field-initializers]
+ 1012 |   VkDescriptorPoolCreateInfo pool_info = {VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
+      |                                                                                        ^
+/home/runner/work/hl360-Forza2/hl360-Forza2/sdk/src/graphics/vulkan/texture_cache.cpp:1021:94: warning: missing field 'pNext' initializer [-Wmissing-field-initializers]
+ 1021 |   VkDescriptorSetAllocateInfo allocate_info = {VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
+      |                                                                                              ^
+/home/runner/work/hl360-Forza2/hl360-Forza2/sdk/src/graphics/vulkan/texture_cache.cpp:1037:76: warning: missing field 'pNext' initializer [-Wmissing-field-initializers]
+ 1037 |   VkSamplerCreateInfo sampler_info = {VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
+      |                                                                            ^
+198 warnings generated.
+ninja: build stopped: subcommand failed.
+== tail of the configure log ==
+--   SDL_X11_XSCRNSAVER          (Wanted: OFF): OFF
+--   SDL_X11_XSHAPE              (Wanted: OFF): OFF
+--   SDL_X11_XSYNC               (Wanted: OFF): OFF
+--   SDL_X11_XTEST               (Wanted: OFF): OFF
+--   SDL_XINPUT                  (Wanted: OFF): OFF
+-- 
+--  Build Shared Library: OFF
+--  Build Static Library: ON
+-- 
+-- Enabled backends:
+--   Video drivers: android offscreen
+--   Render drivers: 
+--   GPU drivers: openxr vulkan
+--   Audio drivers: aaudio opensles
+--   Joystick drivers: android hidapi virtual
+--   Camera drivers: dummy
+-- 
+-- If something was not detected, although the libraries
+-- were installed, then make sure you have set the
+-- CMAKE_C_FLAGS and CMAKE_PREFIX_PATH CMake variables correctly.
+-- 
+-- Found Python3: /usr/bin/python3.12 (found version "3.12.3") found components: Interpreter
+CMake Deprecation Warning at /home/runner/work/hl360-Forza2/hl360-Forza2/sdk/thirdparty/glslang/CMakeLists.txt:39 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+
+
+CMake Warning (dev) at /home/runner/work/hl360-Forza2/hl360-Forza2/sdk/thirdparty/spirv-tools/CMakeLists.txt:237 (find_package):
+  Policy CMP0148 is not set: The FindPythonInterp and FindPythonLibs modules
+  are removed.  Run "cmake --help-policy CMP0148" for policy details.  Use
+  the cmake_policy command to set the policy and suppress this warning.
+
+Call Stack (most recent call first):
+  /home/runner/work/hl360-Forza2/hl360-Forza2/sdk/thirdparty/glslang/CMakeLists.txt:239 (find_host_package)
+This warning is for project developers.  Use -Wno-dev to suppress it.
+
+-- Found PythonInterp: /usr/bin/python3 (found suitable version "3.12.3", minimum required is "3")
+-- The ASM compiler identification is Clang with GNU-like command-line
+-- Found assembler: /home/runner/android-sdk/ndk/29.0.14206865/toolchains/llvm/prebuilt/linux-x86_64/bin/clang
+-- ===========================================
+-- ReXGlue Configuration Summary:
+--   Version: 0.10.0.0-dev.unknown (dev)
+--   Platform: android-arm64
+--   Compiler: Clang 21.0.0
+--   Configurations: 
+--   Output Dir: /home/runner/work/hl360-Forza2/hl360-Forza2/forza2/build/android/rexglue-artifacts
+--   C++ Standard: C++23
+--   Graphics: D3D12=OFF Vulkan=ON
+--   FidelityFX: OFF
+--   Tracy: OFF
+--   Perf Counters: ON
+-- ===========================================
+-- Using ReXGlue SDK from source tree: /home/runner/work/hl360-Forza2/hl360-Forza2/sdk
+-- Configuring done (15.5s)
+-- Generating done (0.2s)
+-- Build files have been written to: /home/runner/work/hl360-Forza2/hl360-Forza2/forza2/build/android
