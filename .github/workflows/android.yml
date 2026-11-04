@@ -1,0 +1,157 @@
+name: Android (arm64)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [android]
+    paths-ignore:
+      - '**.md'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NDK_VERSION: 29.0.14206865
+  BUILD_TOOLS: 36.0.0
+  PLATFORM: android-36
+  CCACHE_SLOPPINESS: pch_defines,time_macros,include_file_mtime,include_file_ctime
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 350
+    steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost /usr/local/lib/node_modules "$AGENT_TOOLSDIRECTORY" || true
+          df -h /
+
+      - uses: actions/checkout@v4
+        with:
+          path: forza2
+
+      - uses: actions/checkout@v4
+        with:
+          repository: y1ad/shiftglue-sdk
+          path: sdk
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Apply the Vulkan async-pipelines SDK patch
+        run: |
+          patch="$GITHUB_WORKSPACE/forza2/cmake/patches/vulkan-async-pipelines.patch"
+          cd sdk
+          if git apply --check "$patch" 2>/dev/null; then
+            git apply "$patch" && echo "patch applied"
+          elif git apply --check -R "$patch" 2>/dev/null; then
+            echo "patch already in the SDK"
+          else
+            echo "::warning::vulkan-async-pipelines.patch does not apply; building the SDK as it is"
+          fi
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Android SDK, NDK and build tools
+        run: |
+          export ANDROID_HOME="$HOME/android-sdk"
+          mkdir -p "$ANDROID_HOME"
+          SDKM="$(ls /usr/local/lib/android/sdk/cmdline-tools/*/bin/sdkmanager | head -1)"
+          yes | "$SDKM" --sdk_root="$ANDROID_HOME" --licenses > /dev/null || true
+          "$SDKM" --sdk_root="$ANDROID_HOME" "ndk;$NDK_VERSION" "build-tools;$BUILD_TOOLS" "platforms;$PLATFORM"
+          echo "ANDROID_HOME=$ANDROID_HOME" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/$NDK_VERSION" >> "$GITHUB_ENV"
+
+      - name: Build tools
+        run: sudo apt-get update && sudo apt-get install -y ninja-build
+
+      - uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: android-arm64
+          max-size: 4G
+
+      - name: Configure
+        working-directory: forza2
+        run: |
+          set -o pipefail
+          mkdir -p build
+          cmake -S . -B build/android -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake" \
+            -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-33 -DANDROID_STL=c++_shared \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_SHARED_LINKER_FLAGS=-Wl,-z,max-page-size=16384 \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            -DREXSDK_DIR="$GITHUB_WORKSPACE/sdk" 2>&1 | tee build/configure.log
+
+      - name: Build the game
+        working-directory: forza2
+        run: |
+          set -o pipefail
+          cmake --build build/android --target forza2 -- -j"$(nproc)" 2>&1 | tee build/build.log
+
+      - name: Build the custom GPU driver hooks (optional)
+        working-directory: forza2
+        continue-on-error: true
+        run: cmake --build build/android --target hook_impl main_hook file_redirect_hook gsl_alloc_hook -- -j"$(nproc)"
+
+      - name: Package the APK
+        working-directory: forza2
+        run: |
+          python3 tools/package_android.py \
+            --build-dir build/android \
+            --sdk-dir "$GITHUB_WORKSPACE/sdk" \
+            --keystore "$HOME/.forza2/forza2.keystore" \
+            --version-name "0.1.0-android.${{ github.run_number }}" \
+            --version-code ${{ github.run_number }} \
+            --output "$PWD/out/forza2-android-arm64.apk"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: forza2-android-arm64
+          path: forza2/out/forza2-android-arm64.apk
+
+      - name: Publish the APK as a pre-release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: android-latest
+          name: Android build (latest)
+          prerelease: true
+          files: forza2/out/forza2-android-arm64.apk
+          body: |
+            Build ${{ github.run_number }} of the android branch (${{ github.sha }}).
+            Needs your own Forza Motorsport 2 files in /sdcard/Forza2/game (see docs/ANDROID.md).
+
+      - name: Publish a failure log to the android-logs branch
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p /tmp/logs
+          {
+            echo "run: $GITHUB_RUN_ID  commit: $GITHUB_SHA"
+            echo "== errors =="
+            grep -nE "error:|FAILED:|CMake Error|undefined (symbol|reference)|fatal error|No such file" forza2/build/*.log 2>/dev/null | head -150
+            echo "== tail of the build log =="
+            tail -n 120 forza2/build/build.log 2>/dev/null
+            echo "== tail of the configure log =="
+            tail -n 60 forza2/build/configure.log 2>/dev/null
+          } > /tmp/logs/last-failure.txt || true
+          url="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git clone --depth 1 --branch android-logs "$url" /tmp/logrepo 2>/dev/null || {
+            git init /tmp/logrepo
+            git -C /tmp/logrepo remote add origin "$url"
+            git -C /tmp/logrepo checkout -b android-logs
+          }
+          cp /tmp/logs/last-failure.txt /tmp/logrepo/last-failure.txt
+          cd /tmp/logrepo
+          git config user.name github-actions
+          git config user.email actions@github.com
+          git add -A
+          git commit -m "CI failure log, run $GITHUB_RUN_ID" || true
+          git push origin android-logs || true

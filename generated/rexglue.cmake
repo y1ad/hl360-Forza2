@@ -108,23 +108,29 @@ macro(rexglue_setup_target target_name)
     rexglue_configure_target(${target_name} ${ARGN})
 endmacro()
 
-# Codegen runs as part of the build, re-running only when an input in codegen.d
-# changes. Build it alone with 'cmake --build . --target forza2_codegen'.
-# Listing the sources as outputs orders any target that compiles them after
-# codegen, including one a project assembles itself rather than taking the
-# library rexglue_setup_target() builds. The stamp comes first: the DEPFILE
-# names it.
-add_custom_command(
-    OUTPUT "${CMAKE_CURRENT_SOURCE_DIR}/generated/default/codegen.build.stamp"
-           ${REXGLUE_ENTRYPOINT_GENERATED_SOURCES}
-    COMMAND $<TARGET_FILE:rex::rexglue> codegen ${CMAKE_CURRENT_SOURCE_DIR}/forza2_manifest.toml
-    DEPFILE "${CMAKE_CURRENT_SOURCE_DIR}/generated/default/codegen.d"
-    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-    COMMENT "Generating recompiled code for forza2"
-    VERBATIM
-)
-add_custom_target(forza2_codegen
-    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/generated/default/codegen.build.stamp")
+if(FORZA2_FROZEN_CODEGEN)
+    # The committed generated/ sources are compiled as they are: no game is
+    # needed and no generator runs (a cross build could not run one either).
+    add_custom_target(forza2_codegen)
+else()
+    # Codegen runs as part of the build, re-running only when an input in codegen.d
+    # changes. Build it alone with 'cmake --build . --target forza2_codegen'.
+    # Listing the sources as outputs orders any target that compiles them after
+    # codegen, including one a project assembles itself rather than taking the
+    # library rexglue_setup_target() builds. The stamp comes first: the DEPFILE
+    # names it.
+    add_custom_command(
+        OUTPUT "${CMAKE_CURRENT_SOURCE_DIR}/generated/default/codegen.build.stamp"
+               ${REXGLUE_ENTRYPOINT_GENERATED_SOURCES}
+        COMMAND $<TARGET_FILE:rex::rexglue> codegen ${CMAKE_CURRENT_SOURCE_DIR}/forza2_manifest.toml
+        DEPFILE "${CMAKE_CURRENT_SOURCE_DIR}/generated/default/codegen.d"
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        COMMENT "Generating recompiled code for forza2"
+        VERBATIM
+    )
+    add_custom_target(forza2_codegen
+        DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/generated/default/codegen.build.stamp")
+endif()
 
 # Include DLL module shared library targets if codegen has generated them
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/generated/default/dll_targets.cmake")

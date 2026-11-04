@@ -1,0 +1,9 @@
+# Android overrides, loaded after forza2.toml (Forza2App::OnConfigurePaths).
+# The player's forza2.user.toml, in the same folder, loads after this file.
+
+# No keyboard on a phone: a gamepad (Bluetooth or USB) is the controller.
+mnk_mode = false
+
+# Phone GPUs: start at the guest's native 720p and a light anisotropic filter.
+resolution_scale = 1
+anisotropic_override = 2

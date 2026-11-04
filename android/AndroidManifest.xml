@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Forza Motorsport 2 native port for Android. Adapted from the manifest of
+  arcanite24/pinyon-shift (BSD 3-Clause, Copyright (c) 2026 Pinyon Shift
+  contributors). No game files are packaged: the player provides their own.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="io.github.y1ad.forza2"
+    android:installLocation="auto">
+
+    <!-- The renderer is Vulkan only. -->
+    <uses-feature
+        android:name="android.hardware.vulkan.version"
+        android:version="0x401000"
+        android:required="true" />
+
+    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+    <uses-feature android:name="android.hardware.gamepad" android:required="false" />
+    <uses-feature android:name="android.hardware.bluetooth" android:required="false" />
+    <uses-feature android:name="android.hardware.usb.host" android:required="false" />
+
+    <!-- Rumble on the device itself (SDL's haptics). -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+
+    <!-- The title opens system-link sockets at the menus; without this
+         permission socket() fails. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- The game lives in /sdcard/Forza2/game, where a phone's file manager
+         can put it. Without this permission the app uses its own folder,
+         Android/data/io.github.y1ad.forza2/files. -->
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
+
+    <application
+        android:label="@string/app_name"
+        android:icon="@android:drawable/sym_def_app_icon"
+        android:allowBackup="false"
+        android:hasCode="true"
+        android:extractNativeLibs="true"
+        android:isGame="true"
+        android:appCategory="game"
+        android:largeHeap="true"
+        android:hardwareAccelerated="true"
+        android:enableOnBackInvokedCallback="false">
+
+        <!-- The title is 16:9 at any width; letterboxed by the presenter. -->
+        <meta-data android:name="android.max_aspect" android:value="3.0" />
+
+        <activity
+            android:name=".Forza2Activity"
+            android:label="@string/app_name"
+            android:theme="@android:style/Theme.NoTitleBar.Fullscreen"
+            android:screenOrientation="sensorLandscape"
+            android:resizeableActivity="false"
+            android:alwaysRetainTaskState="true"
+            android:launchMode="singleInstance"
+            android:configChanges="layoutDirection|locale|fontScale|orientation|uiMode|screenLayout|screenSize|smallestScreenSize|keyboard|keyboardHidden|navigation"
+            android:preferMinimalPostProcessing="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>

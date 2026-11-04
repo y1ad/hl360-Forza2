@@ -4,6 +4,10 @@
 
 #pragma once
 
+#include <cstdlib>
+#include <filesystem>
+#include <system_error>
+
 #include <rex/cvar.h>
 #include <rex/filesystem.h>
 #include <rex/filesystem/devices/host_path_device.h>
@@ -63,24 +67,52 @@ class Forza2App : public rex::ReXApp {
   // The SDK reads game_data_root/user_data_root before it loads any config,
   // so both files are loaded here first: then they can carry the game path and
   // the gamertag.
+  //
+  // Android has no exe folder to write to: Forza2Activity exports the folder
+  // (FORZA2_ANDROID_ROOT) that holds the settings it copies out of the APK at
+  // every start (forza2.toml, then forza2.android.toml over it), the player's
+  // forza2.user.toml, the game (game/), the saves and caches (state/) and the
+  // log (logs/).
   void OnConfigurePaths(rex::PathConfig& paths) override {
+    std::filesystem::path android_root;
+#if defined(__ANDROID__)
+    if (const char* root = std::getenv("FORZA2_ANDROID_ROOT")) {
+      android_root = root;
+      std::error_code ec;
+      std::filesystem::create_directories(android_root / "logs", ec);
+      paths.config_path = android_root / "forza2.toml";
+      paths.cache_root = android_root / "state" / "cache";
+      rex::cvar::SetFlagByName("log_file", (android_root / "logs" / "forza2.log").string());
+    }
+#endif
     const auto user_config = paths.config_path.parent_path() / "forza2.user.toml";
     if (std::filesystem::exists(paths.config_path)) {
       rex::cvar::LoadConfig(paths.config_path);
     }
+#if defined(__ANDROID__)
+    if (!android_root.empty()) {
+      const auto overlay = android_root / "forza2.android.toml";
+      if (std::filesystem::exists(overlay)) {
+        rex::cvar::LoadConfig(overlay);
+      }
+    }
+#endif
     if (std::filesystem::exists(user_config)) {
       rex::cvar::LoadConfig(user_config);
       paths.config_path = user_config;
     }
     if (paths.game_data_root.empty()) {
       std::string from_config = REXCVAR_GET(game_data_root);
-      paths.game_data_root = from_config.empty()
-                                 ? rex::filesystem::GetExecutableFolder() / "game"
-                                 : std::filesystem::path(from_config);
+      const std::filesystem::path default_root =
+          (android_root.empty() ? rex::filesystem::GetExecutableFolder() : android_root) / "game";
+      paths.game_data_root =
+          from_config.empty() ? default_root : std::filesystem::path(from_config);
     }
     // One user-data folder per profile, unless the user pinned one explicitly.
     if (std::string(REXCVAR_GET(user_data_root)).empty()) {
-      paths.user_data_root = forza2::ProfileUserDataRoot(paths.user_data_root);
+      const std::filesystem::path base =
+          android_root.empty() ? paths.user_data_root : android_root / "state";
+      paths.user_data_root = forza2::ProfileUserDataRoot(base);
     }
     user_data_root_ = paths.user_data_root;
     game_data_root_ = paths.game_data_root;
