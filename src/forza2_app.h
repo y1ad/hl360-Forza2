@@ -16,6 +16,14 @@
 #include <rex/ui/overlay/achievement_notification.h>
 #include <rex/system/kernel_state.h>
 
+#if defined(__ANDROID__)
+#include <rex/input/input_system.h>
+#include <rex/ui/imgui_dialog.h>
+#include <rex/ui/window.h>
+
+#include "touch_pad.h"
+#endif
+
 #include "profile.h"
 #include "lan.h"
 
@@ -34,15 +42,22 @@ class Forza2App : public rex::ReXApp {
 
   // Override virtual hooks for customization:
   // void OnPostInitLogging() override {}
-  // void OnPreSetup(rex::RuntimeConfig& config) override {}
   // void OnLoadXexImage(std::string& xex_image) override {}
   // void OnPostLoadXexImage() override {}
   // void OnPostSetup() override {}
-  // void OnCreateDialogs(rex::ui::ImGuiDrawer* drawer) override {}
   // std::unique_ptr<rex::ui::ImGuiDialog> CreateAchievementsOverlay() override;
   // std::unique_ptr<rex::ui::AchievementNotificationDialog>
   // CreateAchievementNotificationDialog() override;
-  void OnShutdown() override { forza2::lan::Shutdown(); }
+  void OnShutdown() override {
+    forza2::lan::Shutdown();
+#if defined(__ANDROID__)
+    // Before the window and the ImGui drawer go away.
+    if (window()) {
+      window()->RemoveInputListener(&forza2::TouchPad::Get());
+    }
+    touch_overlay_.reset();
+#endif
+  }
 
   void OnPreSetup(rex::RuntimeConfig& config) override {
     forza2::lan::ValidateConfiguration();
@@ -52,7 +67,33 @@ class Forza2App : public rex::ReXApp {
     config.gpu_plugin = "fh1";
     // FM2 must not inherit the Forza Horizon native surface executor.
     rex::cvar::SetFlagByName("vulkan_fh1_native_executor", "false");
+#if defined(__ANDROID__)
+    // The on-screen controls feed user 0 beside any gamepad.
+    if (REXCVAR_GET(forza2_touch_controls) && config.input_factory) {
+      config.input_factory = [base = config.input_factory](bool tool_mode) {
+        auto input = base(tool_mode);
+        if (!tool_mode) {
+          if (auto* system = dynamic_cast<rex::input::InputSystem*>(input.get())) {
+            system->AddDriver(forza2::TouchPad::Get().CreateDriver());
+          }
+        }
+        return input;
+      };
+    }
+#endif
   }
+
+#if defined(__ANDROID__)
+  // The window and the ImGui drawer exist here: listen for touches and draw
+  // the controls (hidden until the first touch).
+  void OnCreateDialogs(rex::ui::ImGuiDrawer* drawer) override {
+    if (!REXCVAR_GET(forza2_touch_controls) || !window()) {
+      return;
+    }
+    window()->AddInputListener(&forza2::TouchPad::Get(), 0);
+    touch_overlay_ = forza2::CreateTouchOverlay(drawer);
+  }
+#endif
 
   void OnPostInitLogging() override {
     forza2::InstallCrashReporter();
@@ -172,4 +213,7 @@ class Forza2App : public rex::ReXApp {
  private:
   std::filesystem::path user_data_root_;
   std::filesystem::path game_data_root_;
+#if defined(__ANDROID__)
+  std::unique_ptr<rex::ui::ImGuiDialog> touch_overlay_;
+#endif
 };

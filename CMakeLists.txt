@@ -66,6 +66,8 @@ if(ANDROID)
     # Automation only; its wrapper has no way to reach the runtime's own
     # XamInputGetState outside Windows and would leave the pad dead.
     list(REMOVE_ITEM FORZA2_SOURCES src/scripted_input.cpp)
+    # The on-screen controls.
+    list(APPEND FORZA2_SOURCES src/touch_pad.cpp)
     add_library(forza2 SHARED ${FORZA2_SOURCES})
     set_target_properties(forza2 PROPERTIES OUTPUT_NAME main)
     # Generated functions are weak, default-visibility symbols: bind calls to
